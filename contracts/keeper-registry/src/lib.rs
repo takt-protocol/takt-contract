@@ -5,6 +5,9 @@ pub mod events;
 pub mod storage;
 pub mod types;
 
+#[cfg(test)]
+mod test;
+
 use soroban_sdk::{contract, contractimpl, token, Address, Env};
 
 use crate::errors::RegistryError;
