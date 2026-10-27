@@ -29,7 +29,7 @@ fn setup_test() -> (
     let token_client = TokenClient::new(&env, &token_addr);
     let token_admin_client = StellarAssetClient::new(&env, &token_addr);
 
-    let contract_id = env.register_contract(None, KeeperRegistry);
+    let contract_id = env.register(KeeperRegistry, ());
     let client = KeeperRegistryClient::new(&env, &contract_id);
 
     client.initialize(&admin, &token_addr, &1_000_000_000, &86_400);
