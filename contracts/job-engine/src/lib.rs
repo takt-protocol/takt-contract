@@ -1,5 +1,8 @@
 #![no_std]
 
+#[cfg(test)]
+mod test;
+
 pub mod errors;
 pub mod events;
 pub mod interfaces;

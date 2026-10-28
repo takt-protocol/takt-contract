@@ -11,3 +11,5 @@ soroban-sdk = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+keeper-registry = { path = "../keeper-registry" }
+bounty-vault = { path = "../bounty-vault" }
