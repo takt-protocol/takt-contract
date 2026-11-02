@@ -53,4 +53,5 @@ pub enum DataKey {
     NextJobId,
     Job(u64),
     LastReceipt(u64),
+    OwnerJobs(Address),
 }

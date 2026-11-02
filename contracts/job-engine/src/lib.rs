@@ -89,6 +89,7 @@ impl JobEngine {
         };
 
         storage::set_job(&env, &job);
+        storage::add_owner_job(&env, &owner, job_id);
         storage::extend_instance_ttl(&env);
 
         events::emit_job_created(
@@ -279,5 +280,27 @@ impl JobEngine {
 
     pub fn get_total_jobs(env: Env) -> u64 {
         storage::get_next_job_id(&env).saturating_sub(1)
+    }
+
+    pub fn get_jobs_by_owner(env: Env, owner: Address, offset: u32, limit: u32) -> Vec<Job> {
+        let capped_limit = limit.min(20);
+        let job_ids = storage::get_owner_job_ids(&env, &owner);
+        let total = job_ids.len();
+
+        let mut jobs = Vec::new(&env);
+        if offset >= total || capped_limit == 0 {
+            return jobs;
+        }
+
+        let end = (offset.saturating_add(capped_limit)).min(total);
+        for i in offset..end {
+            if let Some(job_id) = job_ids.get(i) {
+                if let Ok(job) = storage::get_job(&env, job_id) {
+                    jobs.push_back(job);
+                }
+            }
+        }
+
+        jobs
     }
 }

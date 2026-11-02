@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{Address, Env, Vec};
 
 use crate::errors::EngineError;
 use crate::types::{
@@ -108,4 +108,35 @@ pub fn get_last_receipt(env: &Env, job_id: u64) -> Option<ExecutionReceipt> {
         );
     }
     receipt
+}
+
+pub fn get_owner_job_ids(env: &Env, owner: &Address) -> Vec<u64> {
+    let key = DataKey::OwnerJobs(owner.clone());
+    let ids: Option<Vec<u64>> = env.storage().persistent().get(&key);
+    if let Some(list) = ids {
+        env.storage().persistent().extend_ttl(
+            &key,
+            PERSISTENT_LIFETIME_THRESHOLD,
+            PERSISTENT_BUMP_AMOUNT,
+        );
+        list
+    } else {
+        Vec::new(env)
+    }
+}
+
+pub fn add_owner_job(env: &Env, owner: &Address, job_id: u64) {
+    let key = DataKey::OwnerJobs(owner.clone());
+    let mut ids: Vec<u64> = env
+        .storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| Vec::new(env));
+    ids.push_back(job_id);
+    env.storage().persistent().set(&key, &ids);
+    env.storage().persistent().extend_ttl(
+        &key,
+        PERSISTENT_LIFETIME_THRESHOLD,
+        PERSISTENT_BUMP_AMOUNT,
+    );
 }
