@@ -13,6 +13,11 @@ pub fn emit_initialized(
     );
 }
 
+pub fn emit_fee_updated(env: &Env, admin: &Address, new_fee_bps: u32) {
+    env.events()
+        .publish((symbol_short!("set_fee"), admin.clone()), new_fee_bps);
+}
+
 pub fn emit_engine_set(env: &Env, admin: &Address, engine: &Address) {
     env.events()
         .publish((symbol_short!("set_eng"), admin.clone()), engine.clone());
