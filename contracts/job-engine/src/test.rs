@@ -194,3 +194,71 @@ fn test_pause_resume_and_cancel_with_escrow_refund() {
     assert_eq!(f.vault.get_user_balance(&owner), 1_000_000);
     assert_eq!(f.engine.get_job(&job_id).status, JobStatus::Cancelled);
 }
+
+#[test]
+fn test_get_jobs_by_owner_pagination_and_isolation() {
+    let f = setup_fixture();
+
+    let owner_a = Address::generate(&f.env);
+    let owner_b = Address::generate(&f.env);
+    let owner_empty = Address::generate(&f.env);
+
+    f.token_admin_client.mint(&owner_a, &50_000_000);
+    f.token_admin_client.mint(&owner_b, &10_000_000);
+    f.vault.deposit(&owner_a, &50_000_000);
+    f.vault.deposit(&owner_b, &10_000_000);
+
+    let args: Vec<Val> = vec![&f.env, 1u32.into_val(&f.env)];
+
+    // Create 25 jobs for owner_a and 2 jobs for owner_b
+    for _ in 0..25 {
+        f.engine.create_job(
+            &owner_a,
+            &f.counter_addr,
+            &Symbol::new(&f.env, "increment"),
+            &args,
+            &30,
+            &100_000,
+            &1,
+            &100_000,
+        );
+    }
+
+    for _ in 0..2 {
+        f.engine.create_job(
+            &owner_b,
+            &f.counter_addr,
+            &Symbol::new(&f.env, "increment"),
+            &args,
+            &60,
+            &200_000,
+            &1,
+            &200_000,
+        );
+    }
+
+    // 1. Empty owner returns empty Vec
+    assert_eq!(f.engine.get_jobs_by_owner(&owner_empty, &0, &10).len(), 0);
+
+    // 2. Limit > 20 is capped at 20 items
+    let page1 = f.engine.get_jobs_by_owner(&owner_a, &0, &50);
+    assert_eq!(page1.len(), 20);
+    assert_eq!(page1.get(0).unwrap().id, 1);
+    assert_eq!(page1.get(19).unwrap().id, 20);
+
+    // 3. Partial second page (remaining 5 items for owner_a)
+    let page2 = f.engine.get_jobs_by_owner(&owner_a, &20, &20);
+    assert_eq!(page2.len(), 5);
+    assert_eq!(page2.get(0).unwrap().id, 21);
+    assert_eq!(page2.get(4).unwrap().id, 25);
+
+    // 4. Offset out of bounds returns empty Vec
+    let out_of_bounds = f.engine.get_jobs_by_owner(&owner_a, &25, &10);
+    assert_eq!(out_of_bounds.len(), 0);
+
+    // 5. Distinct owner isolation
+    let b_jobs = f.engine.get_jobs_by_owner(&owner_b, &0, &10);
+    assert_eq!(b_jobs.len(), 2);
+    assert_eq!(b_jobs.get(0).unwrap().id, 26);
+    assert_eq!(b_jobs.get(1).unwrap().id, 27);
+}

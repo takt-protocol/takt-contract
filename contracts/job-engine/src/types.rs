@@ -6,6 +6,7 @@ pub const PERSISTENT_LIFETIME_THRESHOLD: u32 = 120_960; // ~7 days
 pub const PERSISTENT_BUMP_AMOUNT: u32 = 518_400; // ~30 days
 
 pub const MIN_INTERVAL_SECONDS: u64 = 5;
+pub const MAX_PAGE_LIMIT: u32 = 20;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -53,4 +54,5 @@ pub enum DataKey {
     NextJobId,
     Job(u64),
     LastReceipt(u64),
+    OwnerJobs(Address),
 }

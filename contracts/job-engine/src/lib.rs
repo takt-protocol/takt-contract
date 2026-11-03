@@ -14,7 +14,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
 
 use crate::errors::EngineError;
 use crate::interfaces::{BountyVaultCrossClient, KeeperRegistryCrossClient};
-use crate::types::{ExecutionReceipt, Job, JobStatus, MIN_INTERVAL_SECONDS};
+use crate::types::{ExecutionReceipt, Job, JobStatus, MAX_PAGE_LIMIT, MIN_INTERVAL_SECONDS};
 
 #[contract]
 pub struct JobEngine;
@@ -89,6 +89,7 @@ impl JobEngine {
         };
 
         storage::set_job(&env, &job);
+        storage::add_owner_job(&env, &owner, job_id);
         storage::extend_instance_ttl(&env);
 
         events::emit_job_created(
@@ -279,5 +280,37 @@ impl JobEngine {
 
     pub fn get_total_jobs(env: Env) -> u64 {
         storage::get_next_job_id(&env).saturating_sub(1)
+    }
+
+    pub fn get_jobs_by_owner(env: Env, owner: Address, offset: u32, limit: u32) -> Vec<Job> {
+        let mut results = Vec::new(&env);
+        if limit == 0 {
+            return results;
+        }
+
+        let capped_limit = if limit > MAX_PAGE_LIMIT {
+            MAX_PAGE_LIMIT
+        } else {
+            limit
+        };
+
+        let job_ids = storage::get_owner_job_ids(&env, &owner);
+        let total = job_ids.len();
+        if offset >= total {
+            return results;
+        }
+
+        let end = offset.saturating_add(capped_limit).min(total);
+        let mut idx = offset;
+        while idx < end {
+            if let Some(job_id) = job_ids.get(idx) {
+                if let Ok(job) = storage::get_job(&env, job_id) {
+                    results.push_back(job);
+                }
+            }
+            idx = idx.saturating_add(1);
+        }
+
+        results
     }
 }
