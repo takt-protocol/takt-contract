@@ -18,6 +18,11 @@ pub fn emit_engine_set(env: &Env, admin: &Address, engine: &Address) {
         .publish((symbol_short!("set_eng"), admin.clone()), engine.clone());
 }
 
+pub fn emit_fee_updated(env: &Env, admin: &Address, new_fee_bps: u32) {
+    env.events()
+        .publish((symbol_short!("set_fee"), admin.clone()), new_fee_bps);
+}
+
 pub fn emit_deposited(env: &Env, owner: &Address, amount: i128, new_balance: i128) {
     env.events().publish(
         (symbol_short!("deposit"), owner.clone()),

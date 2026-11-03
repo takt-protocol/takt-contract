@@ -59,6 +59,22 @@ impl BountyVault {
         Ok(())
     }
 
+    pub fn update_fee_bps(env: Env, new_fee_bps: u32) -> Result<(), VaultError> {
+        let mut config = storage::get_config(&env)?;
+        config.admin.require_auth();
+
+        if new_fee_bps > MAX_FEE_BPS {
+            return Err(VaultError::FeeTooHigh);
+        }
+
+        config.fee_bps = new_fee_bps;
+        storage::set_config(&env, &config);
+        storage::extend_instance_ttl(&env);
+
+        events::emit_fee_updated(&env, &config.admin, new_fee_bps);
+        Ok(())
+    }
+
     pub fn deposit(env: Env, owner: Address, amount: i128) -> Result<i128, VaultError> {
         owner.require_auth();
 

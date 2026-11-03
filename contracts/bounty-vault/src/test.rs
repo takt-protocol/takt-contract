@@ -118,3 +118,26 @@ fn test_fund_job_payout_with_fee_split_and_refund() {
     assert_eq!(client.get_job_escrow(&1), 0);
     assert_eq!(client.get_user_balance(&owner), 800_000);
 }
+
+#[test]
+fn test_update_fee_bps_valid_unauthorized_and_fee_too_high() {
+    let (env, client, _admin, _treasury, _engine, _token_client, _token_admin_client) =
+        setup_test();
+
+    // 1. Valid fee update (e.g. 250 bps = 2.5%, and boundary 1000 bps = 10%)
+    client.update_fee_bps(&250);
+    assert_eq!(client.get_config().fee_bps, 250);
+
+    client.update_fee_bps(&1_000);
+    assert_eq!(client.get_config().fee_bps, 1_000);
+
+    // 2. Reject new_fee_bps > MAX_FEE_BPS (1000) with FeeTooHigh
+    let res = client.try_update_fee_bps(&1_001);
+    assert_eq!(res, Err(Ok(VaultError::FeeTooHigh)));
+    assert_eq!(client.get_config().fee_bps, 1_000);
+
+    // 3. Reject unauthorized caller when admin auth is missing
+    env.mock_auths(&[]);
+    let unauth_res = client.try_update_fee_bps(&300);
+    assert!(unauth_res.is_err());
+}
