@@ -27,6 +27,16 @@ pub struct KeeperInfo {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RegistryConfig {
+    pub admin: Address,
+    pub stake_token: Address,
+    pub min_stake: i128,
+    pub unbond_period: u64,
+    pub job_engine: Option<Address>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
     Admin,
     StakeToken,

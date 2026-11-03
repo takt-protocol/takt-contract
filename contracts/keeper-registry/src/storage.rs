@@ -2,14 +2,18 @@ use soroban_sdk::{Address, Env};
 
 use crate::errors::RegistryError;
 use crate::types::{
-    DataKey, KeeperInfo, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD, PERSISTENT_BUMP_AMOUNT,
-    PERSISTENT_LIFETIME_THRESHOLD,
+    DataKey, KeeperInfo, RegistryConfig, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD,
+    PERSISTENT_BUMP_AMOUNT, PERSISTENT_LIFETIME_THRESHOLD,
 };
 
 pub fn extend_instance_ttl(env: &Env) {
     env.storage()
         .instance()
         .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+}
+
+pub fn extend_instance(env: &Env) {
+    extend_instance_ttl(env);
 }
 
 pub fn has_admin(env: &Env) -> bool {
@@ -71,6 +75,25 @@ pub fn get_job_engine(env: &Env) -> Result<Address, RegistryError> {
         .instance()
         .get(&DataKey::JobEngine)
         .ok_or(RegistryError::UnauthorizedEngine)
+}
+
+pub fn get_config(env: &Env) -> Result<RegistryConfig, RegistryError> {
+    if !has_admin(env) {
+        return Err(RegistryError::NotInitialized);
+    }
+    let admin = get_admin(env)?;
+    let stake_token = get_stake_token(env)?;
+    let min_stake = get_min_stake(env)?;
+    let unbond_period = get_unbond_period(env)?;
+    let job_engine = env.storage().instance().get(&DataKey::JobEngine);
+
+    Ok(RegistryConfig {
+        admin,
+        stake_token,
+        min_stake,
+        unbond_period,
+        job_engine,
+    })
 }
 
 pub fn set_total_keepers(env: &Env, count: u32) {

@@ -24,7 +24,7 @@ fn setup_test() -> (
     let token_admin = Address::generate(&env);
     let engine = Address::generate(&env);
 
-    let token_contract = env.register_stellar_asset_contract_v2(token_admin.clone());
+    let token_contract = env.register_stellar_asset_contract_v2(token_admin);
     let token_addr = token_contract.address();
     let token_client = TokenClient::new(&env, &token_addr);
     let token_admin_client = StellarAssetClient::new(&env, &token_addr);
@@ -140,4 +140,49 @@ fn test_record_execution_and_slash_recovery() {
     let new_total = client.increase_stake(&keeper, &300_000_000);
     assert_eq!(new_total, 1_100_000_000);
     assert!(client.is_active_keeper(&keeper));
+}
+
+#[test]
+fn test_get_config_not_initialized() {
+    let env = Env::default();
+    let contract_id = env.register(KeeperRegistry, ());
+    let client = KeeperRegistryClient::new(&env, &contract_id);
+
+    let res = client.try_get_config();
+    assert_eq!(res, Err(Ok(RegistryError::NotInitialized)));
+}
+
+#[test]
+fn test_get_config_success() {
+    let (_env, client, admin, engine, token_addr, _token_client, _token_admin_client) =
+        setup_test();
+
+    let config = client.get_config();
+    assert_eq!(config.admin, admin);
+    assert_eq!(config.stake_token, token_addr);
+    assert_eq!(config.min_stake, 1_000_000_000);
+    assert_eq!(config.unbond_period, 86_400);
+    assert_eq!(config.job_engine, Some(engine));
+}
+
+#[test]
+fn test_get_config_before_engine_set() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_contract = env.register_stellar_asset_contract_v2(token_admin);
+    let token_addr = token_contract.address();
+
+    let contract_id = env.register(KeeperRegistry, ());
+    let client = KeeperRegistryClient::new(&env, &contract_id);
+
+    client.initialize(&admin, &token_addr, &1_000_000_000, &86_400);
+
+    let config = client.get_config();
+    assert_eq!(config.admin, admin);
+    assert_eq!(config.stake_token, token_addr);
+    assert_eq!(config.min_stake, 1_000_000_000);
+    assert_eq!(config.unbond_period, 86_400);
+    assert_eq!(config.job_engine, None);
 }
