@@ -63,3 +63,16 @@ pub fn emit_job_cancelled(env: &Env, job_id: u64, owner: &Address, refunded_amou
         (owner.clone(), refunded_amount),
     );
 }
+
+pub fn emit_job_topped_up(
+    env: &Env,
+    job_id: u64,
+    caller: &Address,
+    amount: i128,
+    new_escrow: i128,
+) {
+    env.events().publish(
+        (symbol_short!("job_top"), job_id),
+        (caller.clone(), amount, new_escrow),
+    );
+}

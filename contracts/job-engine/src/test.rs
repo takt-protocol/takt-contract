@@ -194,3 +194,55 @@ fn test_pause_resume_and_cancel_with_escrow_refund() {
     assert_eq!(f.vault.get_user_balance(&owner), 1_000_000);
     assert_eq!(f.engine.get_job(&job_id).status, JobStatus::Cancelled);
 }
+
+#[test]
+fn test_top_up_job_escrow_lifecycle_and_rejections() {
+    let f = setup_fixture();
+
+    let owner = Address::generate(&f.env);
+    let caller = Address::generate(&f.env);
+
+    f.token_admin_client.mint(&owner, &5_000_000);
+    f.token_admin_client.mint(&caller, &5_000_000);
+
+    f.vault.deposit(&owner, &1_000_000);
+    f.vault.deposit(&caller, &1_000_000);
+
+    let args: Vec<Val> = vec![&f.env, 1u32.into_val(&f.env)];
+    let job_id = f.engine.create_job(
+        &owner,
+        &f.counter_addr,
+        &Symbol::new(&f.env, "increment"),
+        &args,
+        &30,
+        &100_000,
+        &1,
+        &100_000,
+    );
+
+    assert_eq!(f.vault.get_job_escrow(&job_id), 100_000);
+
+    // 1. Top up active job by caller
+    let updated_escrow = f.engine.top_up_job(&caller, &job_id, &200_000);
+    assert_eq!(updated_escrow, 300_000);
+    assert_eq!(f.vault.get_job_escrow(&job_id), 300_000);
+    assert_eq!(f.vault.get_user_balance(&caller), 800_000);
+
+    // 2. Reject zero or negative amount
+    let zero_err = f.engine.try_top_up_job(&caller, &job_id, &0);
+    assert_eq!(zero_err, Err(Ok(EngineError::InvalidBounty)));
+
+    let neg_err = f.engine.try_top_up_job(&caller, &job_id, &-50_000);
+    assert_eq!(neg_err, Err(Ok(EngineError::InvalidBounty)));
+
+    // 3. Pause job and verify top-up still succeeds
+    f.engine.pause_job(&owner, &job_id);
+    let paused_escrow = f.engine.top_up_job(&owner, &job_id, &100_000);
+    assert_eq!(paused_escrow, 400_000);
+    assert_eq!(f.vault.get_job_escrow(&job_id), 400_000);
+
+    // 4. Cancel job and verify subsequent top-up is rejected
+    f.engine.cancel_job(&owner, &job_id);
+    let cancel_err = f.engine.try_top_up_job(&caller, &job_id, &50_000);
+    assert_eq!(cancel_err, Err(Ok(EngineError::JobNotActive)));
+}

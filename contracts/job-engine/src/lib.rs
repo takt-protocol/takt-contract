@@ -197,6 +197,32 @@ impl JobEngine {
         Ok(())
     }
 
+    pub fn top_up_job(
+        env: Env,
+        caller: Address,
+        job_id: u64,
+        amount: i128,
+    ) -> Result<i128, EngineError> {
+        caller.require_auth();
+
+        if amount <= 0 {
+            return Err(EngineError::InvalidBounty);
+        }
+
+        let job = storage::get_job(&env, job_id)?;
+        if job.status != JobStatus::Active && job.status != JobStatus::Paused {
+            return Err(EngineError::JobNotActive);
+        }
+
+        let vault_addr = storage::get_bounty_vault(&env)?;
+        let vault_client = BountyVaultCrossClient::new(&env, &vault_addr);
+        let new_escrow = vault_client.top_up_job(&caller, &job_id, &amount);
+
+        storage::extend_instance_ttl(&env);
+        events::emit_job_topped_up(&env, job_id, &caller, amount, new_escrow);
+        Ok(new_escrow)
+    }
+
     pub fn resume_job(env: Env, owner: Address, job_id: u64) -> Result<(), EngineError> {
         owner.require_auth();
 

@@ -9,6 +9,7 @@ pub trait KeeperRegistryInterface {
 #[contractclient(name = "BountyVaultCrossClient")]
 pub trait BountyVaultInterface {
     fn fund_job_from_engine(env: Env, owner: Address, job_id: u64, amount: i128) -> i128;
+    fn top_up_job(env: Env, owner: Address, job_id: u64, amount: i128) -> i128;
     fn payout_execution(
         env: Env,
         job_id: u64,
