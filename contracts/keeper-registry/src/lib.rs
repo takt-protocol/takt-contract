@@ -54,6 +54,40 @@ impl KeeperRegistry {
         Ok(())
     }
 
+    pub fn update_min_stake(env: Env, new_min_stake: i128) -> Result<(), RegistryError> {
+        let admin = storage::get_admin(&env)?;
+        admin.require_auth();
+
+        if new_min_stake <= 0 {
+            return Err(RegistryError::InvalidAmount);
+        }
+
+        storage::set_min_stake(&env, new_min_stake);
+        storage::extend_instance_ttl(&env);
+
+        events::emit_min_stake_updated(&env, &admin, new_min_stake);
+        Ok(())
+    }
+
+    pub fn update_unbond_period(env: Env, new_unbond_period: u64) -> Result<(), RegistryError> {
+        let admin = storage::get_admin(&env)?;
+        admin.require_auth();
+
+        storage::set_unbond_period(&env, new_unbond_period);
+        storage::extend_instance_ttl(&env);
+
+        events::emit_unbond_period_updated(&env, &admin, new_unbond_period);
+        Ok(())
+    }
+
+    pub fn get_min_stake(env: Env) -> Result<i128, RegistryError> {
+        storage::get_min_stake(&env)
+    }
+
+    pub fn get_unbond_period(env: Env) -> Result<u64, RegistryError> {
+        storage::get_unbond_period(&env)
+    }
+
     pub fn register_keeper(
         env: Env,
         keeper: Address,

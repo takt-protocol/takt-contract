@@ -51,3 +51,13 @@ pub fn emit_keeper_slashed(env: &Env, keeper: &Address, slash_amount: i128, rema
         (slash_amount, remaining_stake),
     );
 }
+
+pub fn emit_min_stake_updated(env: &Env, admin: &Address, new_min_stake: i128) {
+    env.events()
+        .publish((symbol_short!("set_mstk"), admin.clone()), new_min_stake);
+}
+
+pub fn emit_unbond_period_updated(env: &Env, admin: &Address, new_unbond_period: u64) {
+    env.events()
+        .publish((symbol_short!("set_ubnd"), admin.clone()), new_unbond_period);
+}

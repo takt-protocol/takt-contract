@@ -141,3 +141,46 @@ fn test_record_execution_and_slash_recovery() {
     assert_eq!(new_total, 1_100_000_000);
     assert!(client.is_active_keeper(&keeper));
 }
+
+#[test]
+fn test_update_min_stake_and_unbond_period_lifecycle() {
+    let (env, client, _admin, _engine, _token_addr, _token_client, token_admin_client) =
+        setup_test();
+
+    // 1. Initial values
+    assert_eq!(client.get_min_stake(), 1_000_000_000);
+    assert_eq!(client.get_unbond_period(), 86_400);
+
+    // 2. Register first keeper with original min stake
+    let keeper1 = Address::generate(&env);
+    token_admin_client.mint(&keeper1, &2_000_000_000);
+    client.register_keeper(&keeper1, &1_000_000_000);
+    assert!(client.is_active_keeper(&keeper1));
+
+    // 3. Reject zero or negative min stake
+    let zero_err = client.try_update_min_stake(&0);
+    assert_eq!(zero_err, Err(Ok(RegistryError::InvalidAmount)));
+    let neg_err = client.try_update_min_stake(&-100);
+    assert_eq!(neg_err, Err(Ok(RegistryError::InvalidAmount)));
+
+    // 4. Update min stake to 2_000_000_000
+    client.update_min_stake(&2_000_000_000);
+    assert_eq!(client.get_min_stake(), 2_000_000_000);
+
+    // 5. Existing keeper1 remains active even though their stake is now below new min_stake
+    assert!(client.is_active_keeper(&keeper1));
+
+    // 6. New keeper registering with old 1_000_000_000 stake is rejected with InsufficientStake
+    let keeper2 = Address::generate(&env);
+    token_admin_client.mint(&keeper2, &3_000_000_000);
+    let low_stake_err = client.try_register_keeper(&keeper2, &1_000_000_000);
+    assert_eq!(low_stake_err, Err(Ok(RegistryError::InsufficientStake)));
+
+    // New keeper registering with >= 2_000_000_000 succeeds
+    client.register_keeper(&keeper2, &2_000_000_000);
+    assert!(client.is_active_keeper(&keeper2));
+
+    // 7. Update unbond period
+    client.update_unbond_period(&172_800);
+    assert_eq!(client.get_unbond_period(), 172_800);
+}
