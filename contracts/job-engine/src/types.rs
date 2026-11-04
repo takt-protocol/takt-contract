@@ -1,5 +1,7 @@
 use soroban_sdk::{contracttype, Address, Symbol, Val, Vec};
 
+pub use crate::errors::EngineError;
+
 pub const INSTANCE_LIFETIME_THRESHOLD: u32 = 17_280; // ~1 day
 pub const INSTANCE_BUMP_AMOUNT: u32 = 518_400; // ~30 days
 pub const PERSISTENT_LIFETIME_THRESHOLD: u32 = 120_960; // ~7 days

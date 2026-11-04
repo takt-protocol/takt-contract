@@ -16,4 +16,5 @@ pub enum EngineError {
     IntervalNotElapsed = 10,
     MaxRunsReached = 11,
     Overflow = 12,
+    ForbiddenTarget = 13,
 }

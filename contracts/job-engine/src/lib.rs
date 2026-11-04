@@ -66,6 +66,16 @@ impl JobEngine {
         }
 
         let vault_addr = storage::get_bounty_vault(&env)?;
+        let registry_addr = storage::get_keeper_registry(&env)?;
+        let current_addr = env.current_contract_address();
+
+        if target_contract == vault_addr
+            || target_contract == registry_addr
+            || target_contract == current_addr
+        {
+            return Err(EngineError::ForbiddenTarget);
+        }
+
         let job_id = storage::get_next_job_id(&env);
         let next_id = job_id.checked_add(1).ok_or(EngineError::Overflow)?;
         storage::set_next_job_id(&env, next_id);
