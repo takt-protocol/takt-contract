@@ -118,3 +118,33 @@ fn test_fund_job_payout_with_fee_split_and_refund() {
     assert_eq!(client.get_job_escrow(&1), 0);
     assert_eq!(client.get_user_balance(&owner), 800_000);
 }
+
+#[test]
+fn test_update_treasury_and_fee_routing() {
+    let (env, client, _admin, treasury, _engine, token_client, token_admin_client) = setup_test();
+
+    let owner = Address::generate(&env);
+    let keeper = Address::generate(&env);
+    let new_treasury = Address::generate(&env);
+    token_admin_client.mint(&owner, &1_000_000);
+
+    client.deposit(&owner, &1_000_000);
+    client.fund_job_from_engine(&owner, &1, &500_000);
+
+    // Initial payout: fee routes to original treasury
+    let (_reward1, fee1) = client.payout_execution(&1, &keeper, &200_000);
+    assert_eq!(fee1, 10_000);
+    assert_eq!(token_client.balance(&treasury), 10_000);
+    assert_eq!(token_client.balance(&new_treasury), 0);
+
+    // Rotate treasury to new_treasury
+    client.update_treasury(&new_treasury);
+    let config = client.get_config();
+    assert_eq!(config.treasury, new_treasury);
+
+    // Second payout: fee routes to new_treasury
+    let (_reward2, fee2) = client.payout_execution(&1, &keeper, &200_000);
+    assert_eq!(fee2, 10_000);
+    assert_eq!(token_client.balance(&treasury), 10_000);
+    assert_eq!(token_client.balance(&new_treasury), 10_000);
+}

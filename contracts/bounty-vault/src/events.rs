@@ -65,3 +65,8 @@ pub fn emit_refunded(env: &Env, job_id: u64, owner: &Address, refunded_amount: i
         (owner.clone(), refunded_amount),
     );
 }
+
+pub fn emit_treasury_updated(env: &Env, admin: &Address, new_treasury: &Address) {
+    env.events()
+        .publish((symbol_short!("set_trs"), admin.clone()), new_treasury.clone());
+}

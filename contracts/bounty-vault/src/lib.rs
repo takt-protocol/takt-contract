@@ -59,6 +59,18 @@ impl BountyVault {
         Ok(())
     }
 
+    pub fn update_treasury(env: Env, new_treasury: Address) -> Result<(), VaultError> {
+        let mut config = storage::get_config(&env)?;
+        config.admin.require_auth();
+
+        config.treasury = new_treasury.clone();
+        storage::set_config(&env, &config);
+        storage::extend_instance_ttl(&env);
+
+        events::emit_treasury_updated(&env, &config.admin, &new_treasury);
+        Ok(())
+    }
+
     pub fn deposit(env: Env, owner: Address, amount: i128) -> Result<i128, VaultError> {
         owner.require_auth();
 
