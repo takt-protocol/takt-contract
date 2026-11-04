@@ -51,3 +51,8 @@ pub fn emit_keeper_slashed(env: &Env, keeper: &Address, slash_amount: i128, rema
         (slash_amount, remaining_stake),
     );
 }
+
+pub fn emit_keeper_reinstated(env: &Env, keeper: &Address, remaining_stake: i128) {
+    env.events()
+        .publish((symbol_short!("reinst"), keeper.clone()), remaining_stake);
+}

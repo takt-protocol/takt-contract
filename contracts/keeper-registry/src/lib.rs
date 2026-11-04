@@ -121,6 +121,10 @@ impl KeeperRegistry {
 
         if info.status == KeeperStatus::Slashed && info.staked_amount >= min_stake {
             info.status = KeeperStatus::Active;
+            let total = storage::get_total_keepers(&env)
+                .checked_add(1)
+                .ok_or(RegistryError::Overflow)?;
+            storage::set_total_keepers(&env, total);
         }
 
         storage::set_keeper(&env, &info);
@@ -228,8 +232,11 @@ impl KeeperRegistry {
             .ok_or(RegistryError::Overflow)?;
         info.slashes = info.slashes.checked_add(1).ok_or(RegistryError::Overflow)?;
 
-        if info.staked_amount < min_stake {
-            info.status = KeeperStatus::Slashed;
+        let was_active = info.status == KeeperStatus::Active;
+        info.status = KeeperStatus::Slashed;
+        if was_active {
+            let total = storage::get_total_keepers(&env).saturating_sub(1);
+            storage::set_total_keepers(&env, total);
         }
 
         storage::set_keeper(&env, &info);
@@ -242,6 +249,30 @@ impl KeeperRegistry {
 
         events::emit_keeper_slashed(&env, &keeper, slash_amount, info.staked_amount);
         Ok(info.staked_amount)
+    }
+
+    pub fn reinstate_keeper(env: Env, keeper: Address) -> Result<(), RegistryError> {
+        let admin = storage::get_admin(&env)?;
+        admin.require_auth();
+
+        let mut info = storage::get_keeper(&env, &keeper)?;
+        let min_stake = storage::get_min_stake(&env)?;
+
+        if info.staked_amount < min_stake {
+            return Err(RegistryError::InsufficientStake);
+        }
+
+        info.status = KeeperStatus::Active;
+        storage::set_keeper(&env, &info);
+
+        let total = storage::get_total_keepers(&env)
+            .checked_add(1)
+            .ok_or(RegistryError::Overflow)?;
+        storage::set_total_keepers(&env, total);
+        storage::extend_instance_ttl(&env);
+
+        events::emit_keeper_reinstated(&env, &keeper, info.staked_amount);
+        Ok(())
     }
 
     pub fn get_keeper(env: Env, keeper: Address) -> Result<KeeperInfo, RegistryError> {

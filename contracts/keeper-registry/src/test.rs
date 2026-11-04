@@ -141,3 +141,44 @@ fn test_record_execution_and_slash_recovery() {
     assert_eq!(new_total, 1_100_000_000);
     assert!(client.is_active_keeper(&keeper));
 }
+
+#[test]
+fn test_admin_reinstate_keeper_lifecycle() {
+    let (env, client, _admin, _engine, _token_addr, _token_client, token_admin_client) =
+        setup_test();
+
+    let keeper = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    token_admin_client.mint(&keeper, &3_000_000_000);
+
+    // Register with 2_000_000_000 stake (min_stake = 1_000_000_000)
+    client.register_keeper(&keeper, &2_000_000_000);
+    assert_eq!(client.get_total_keepers(), 1);
+
+    // 1. Partial slash of 200_000_000: remaining is 1_800_000_000 >= min_stake
+    let rem1 = client.slash_keeper(&keeper, &200_000_000, &treasury);
+    assert_eq!(rem1, 1_800_000_000);
+    assert_eq!(client.get_keeper(&keeper).status, KeeperStatus::Slashed);
+    assert_eq!(client.get_total_keepers(), 0);
+
+    // Slashed keeper cannot be recorded for job executions
+    let rec_err = client.try_record_execution(&keeper);
+    assert_eq!(rec_err, Err(Ok(RegistryError::KeeperNotActive)));
+
+    // Admin reinstates keeper because remaining stake (1_800_000_000) >= min_stake (1_000_000_000)
+    client.reinstate_keeper(&keeper);
+    assert_eq!(client.get_keeper(&keeper).status, KeeperStatus::Active);
+    assert_eq!(client.get_total_keepers(), 1);
+    assert!(client.is_active_keeper(&keeper));
+
+    // 2. Severe slash of 1_000_000_000: remaining is 800_000_000 < min_stake
+    let rem2 = client.slash_keeper(&keeper, &1_000_000_000, &treasury);
+    assert_eq!(rem2, 800_000_000);
+    assert_eq!(client.get_keeper(&keeper).status, KeeperStatus::Slashed);
+    assert_eq!(client.get_total_keepers(), 0);
+
+    // Reinstatement fails with InsufficientStake while stake < min_stake
+    let rein_err = client.try_reinstate_keeper(&keeper);
+    assert_eq!(rein_err, Err(Ok(RegistryError::InsufficientStake)));
+    assert_eq!(client.get_total_keepers(), 0);
+}
