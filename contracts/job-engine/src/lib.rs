@@ -216,6 +216,41 @@ impl JobEngine {
         Ok(())
     }
 
+    pub fn update_job_config(
+        env: Env,
+        job_id: u64,
+        new_interval_seconds: u64,
+        new_bounty_per_run: i128,
+    ) -> Result<(), EngineError> {
+        let mut job = storage::get_job(&env, job_id)?;
+        job.owner.require_auth();
+
+        if new_interval_seconds < MIN_INTERVAL_SECONDS {
+            return Err(EngineError::InvalidInterval);
+        }
+        if new_bounty_per_run <= 0 {
+            return Err(EngineError::InvalidBounty);
+        }
+        if job.status != JobStatus::Active && job.status != JobStatus::Paused {
+            return Err(EngineError::JobNotActive);
+        }
+
+        job.interval_seconds = new_interval_seconds;
+        job.bounty_per_run = new_bounty_per_run;
+
+        storage::set_job(&env, &job);
+        storage::extend_instance_ttl(&env);
+
+        events::emit_job_config_updated(
+            &env,
+            job_id,
+            &job.owner,
+            new_interval_seconds,
+            new_bounty_per_run,
+        );
+        Ok(())
+    }
+
     pub fn cancel_job(env: Env, owner: Address, job_id: u64) -> Result<i128, EngineError> {
         owner.require_auth();
 

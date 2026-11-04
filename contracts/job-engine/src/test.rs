@@ -194,3 +194,66 @@ fn test_pause_resume_and_cancel_with_escrow_refund() {
     assert_eq!(f.vault.get_user_balance(&owner), 1_000_000);
     assert_eq!(f.engine.get_job(&job_id).status, JobStatus::Cancelled);
 }
+
+#[test]
+fn test_update_job_config_and_subsequent_execution() {
+    let f = setup_fixture();
+
+    let owner = Address::generate(&f.env);
+    let keeper = Address::generate(&f.env);
+
+    f.token_admin_client.mint(&owner, &5_000_000);
+    f.token_admin_client.mint(&keeper, &2_000_000);
+
+    f.registry.register_keeper(&keeper, &1_000_000);
+    f.vault.deposit(&owner, &2_000_000);
+
+    f.env.ledger().with_mut(|li| {
+        li.timestamp = 1_000;
+    });
+
+    let args: Vec<Val> = vec![&f.env, 1u32.into_val(&f.env)];
+    let job_id = f.engine.create_job(
+        &owner,
+        &f.counter_addr,
+        &Symbol::new(&f.env, "increment"),
+        &args,
+        &60,      // initial interval = 60s
+        &100_000, // initial bounty = 100_000
+        &5,       // max 5 runs
+        &1_000_000,
+    );
+
+    // 1. Verify invalid interval is rejected
+    let inv_int = f.engine.try_update_job_config(&job_id, &4, &100_000);
+    assert_eq!(inv_int, Err(Ok(EngineError::InvalidInterval)));
+
+    // 2. Verify non-positive bounty is rejected
+    let inv_bnty = f.engine.try_update_job_config(&job_id, &30, &0);
+    assert_eq!(inv_bnty, Err(Ok(EngineError::InvalidBounty)));
+    let neg_bnty = f.engine.try_update_job_config(&job_id, &30, &-10_000);
+    assert_eq!(neg_bnty, Err(Ok(EngineError::InvalidBounty)));
+
+    // 3. Update job config: interval 20s, bounty 200_000
+    f.engine.update_job_config(&job_id, &20, &200_000);
+    let updated_job = f.engine.get_job(&job_id);
+    assert_eq!(updated_job.interval_seconds, 20);
+    assert_eq!(updated_job.bounty_per_run, 200_000);
+
+    // 4. Execute job at t = 1000 with new bounty (200_000: 5% fee = 10_000 fee, 190_000 keeper)
+    let receipt1 = f.engine.execute_job(&keeper, &job_id);
+    assert_eq!(receipt1.keeper_reward, 190_000);
+    assert_eq!(receipt1.protocol_fee, 10_000);
+
+    // 5. Update config while paused
+    f.engine.pause_job(&owner, &job_id);
+    f.engine.update_job_config(&job_id, &15, &300_000);
+    let paused_job = f.engine.get_job(&job_id);
+    assert_eq!(paused_job.interval_seconds, 15);
+    assert_eq!(paused_job.bounty_per_run, 300_000);
+
+    // 6. Cancel job and verify update is rejected
+    f.engine.cancel_job(&owner, &job_id);
+    let cancel_upd = f.engine.try_update_job_config(&job_id, &30, &200_000);
+    assert_eq!(cancel_upd, Err(Ok(EngineError::JobNotActive)));
+}

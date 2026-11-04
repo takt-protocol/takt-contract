@@ -63,3 +63,16 @@ pub fn emit_job_cancelled(env: &Env, job_id: u64, owner: &Address, refunded_amou
         (owner.clone(), refunded_amount),
     );
 }
+
+pub fn emit_job_config_updated(
+    env: &Env,
+    job_id: u64,
+    owner: &Address,
+    new_interval_seconds: u64,
+    new_bounty_per_run: i128,
+) {
+    env.events().publish(
+        (symbol_short!("job_upd"), job_id),
+        (owner.clone(), new_interval_seconds, new_bounty_per_run),
+    );
+}
