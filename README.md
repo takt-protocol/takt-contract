@@ -150,6 +150,20 @@ Run the automated testnet deployment script to deploy and link all contracts in 
 
 ---
 
+## Maintainers
+
+| Maintainer | Role | Contact |
+|---|---|---|
+| webdevayo | Core Maintainer | [@dev_ayo](https://t.me/dev_ayo) |
+
+---
+
+## Community
+
+- [Community Chat](https://t.me/+9120mKpa2CpkNjg8)
+
+---
+
 ## Contributors
 
 Thank you to everyone contributing to Takt Protocol!
