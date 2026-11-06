@@ -118,3 +118,50 @@ fn test_fund_job_payout_with_fee_split_and_refund() {
     assert_eq!(client.get_job_escrow(&1), 0);
     assert_eq!(client.get_user_balance(&owner), 800_000);
 }
+
+#[test]
+fn test_update_fee_bps_success() {
+    let (_env, client, admin, _treasury, _engine, _token_client, _token_admin_client) =
+        setup_test();
+
+    assert_eq!(client.get_config().fee_bps, 500);
+
+    client.update_fee_bps(&800);
+    let updated = client.get_config();
+    assert_eq!(updated.fee_bps, 800);
+    assert_eq!(updated.admin, admin);
+
+    // Can set to 0 bps
+    client.update_fee_bps(&0);
+    assert_eq!(client.get_config().fee_bps, 0);
+
+    // Can set to MAX_FEE_BPS (1000)
+    client.update_fee_bps(&1000);
+    assert_eq!(client.get_config().fee_bps, 1000);
+}
+
+#[test]
+fn test_update_fee_bps_reject_too_high() {
+    let (_env, client, _admin, _treasury, _engine, _token_client, _token_admin_client) =
+        setup_test();
+
+    let res = client.try_update_fee_bps(&1001);
+    assert_eq!(res, Err(Ok(VaultError::FeeTooHigh)));
+}
+
+#[test]
+#[should_panic]
+fn test_update_fee_bps_unauthorized() {
+    let env = Env::default();
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let token = Address::generate(&env);
+
+    let contract_id = env.register(BountyVault, ());
+    let client = BountyVaultClient::new(&env, &contract_id);
+
+    client.initialize(&admin, &token, &500, &treasury);
+
+    // Calling update_fee_bps requires admin auth, which panics without mock_all_auths
+    client.update_fee_bps(&600);
+}
