@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="Takt Protocol" width="800" />
+</p>
+
 # Takt Protocol — `takt-contract`
 
 [![CI](https://github.com/takt-protocol/takt-contract/actions/workflows/ci.yml/badge.svg)](https://github.com/takt-protocol/takt-contract/actions/workflows/ci.yml)

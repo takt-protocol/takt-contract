@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 120" width="100%" height="120">
+  <rect width="100%" height="100%" rx="12" fill="#0b0f19" stroke="#1e293b" stroke-width="1.5"/>
+  <text x="40" y="52" fill="#38bdf8" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="700" letter-spacing="-0.5">Takt Protocol</text>
+  <text x="40" y="86" fill="#94a3b8" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="400">Decentralized task scheduling and bounty-incentivized keeper execution primitive on Stellar Soroban.</text>
+</svg>
