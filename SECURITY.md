@@ -35,9 +35,3 @@ If you discover a security vulnerability or exploit vector within `takt-contract
 
 Submit vulnerability reports privately through GitHub Security Advisories:
 [Submit a Security Advisory](https://github.com/takt-protocol/takt-contract/security/advisories/new)
-
-### Response SLA
-
-- **Acknowledgment:** Within 48 hours of initial report submission.
-- **Assessment & Triage:** An initial severity assessment and triage update will be shared within 5 business days.
-- **Resolution & Disclosure:** Patches will be developed, tested, and deployed to test environments before coordinated public disclosure.
