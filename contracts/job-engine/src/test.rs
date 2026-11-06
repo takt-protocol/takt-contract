@@ -1,7 +1,7 @@
 #![cfg(test)]
 
-use bounty_vault::{BountyVault, BountyVaultClient};
-use keeper_registry::{KeeperRegistry, KeeperRegistryClient};
+use bounty_vault::{errors::VaultError, BountyVault, BountyVaultClient};
+use keeper_registry::{errors::RegistryError, KeeperRegistry, KeeperRegistryClient};
 use soroban_sdk::{
     contract, contractimpl, symbol_short,
     testutils::{Address as _, Ledger},
@@ -192,5 +192,105 @@ fn test_pause_resume_and_cancel_with_escrow_refund() {
     assert_eq!(refunded, 500_000);
     assert_eq!(f.vault.get_job_escrow(&job_id), 0);
     assert_eq!(f.vault.get_user_balance(&owner), 1_000_000);
+    assert_eq!(f.engine.get_job(&job_id).status, JobStatus::Cancelled);
+}
+
+#[test]
+fn test_multi_keeper_competition_escrow_exhaustion_and_recovery() {
+    let f = setup_fixture();
+
+    let owner = Address::generate(&f.env);
+    let keeper1 = Address::generate(&f.env);
+    let keeper2 = Address::generate(&f.env);
+
+    f.token_admin_client.mint(&owner, &10_000_000);
+    f.token_admin_client.mint(&keeper1, &5_000_000);
+    f.token_admin_client.mint(&keeper2, &5_000_000);
+
+    // Register two competing keepers with 1_000_000 stake each
+    f.registry.register_keeper(&keeper1, &1_000_000);
+    f.registry.register_keeper(&keeper2, &1_000_000);
+    assert_eq!(f.registry.get_total_keepers(), 2);
+
+    // Owner deposits 2_000_000 into vault
+    f.vault.deposit(&owner, &2_000_000);
+
+    f.env.ledger().with_mut(|li| {
+        li.timestamp = 2_000;
+    });
+
+    let args: Vec<Val> = vec![&f.env, 10u32.into_val(&f.env)];
+    // Job: 5 max runs, 100_000 bounty per run, initially funded for only 2 runs (200_000)
+    let job_id = f.engine.create_job(
+        &owner,
+        &f.counter_addr,
+        &Symbol::new(&f.env, "increment"),
+        &args,
+        &30,      // interval = 30s
+        &100_000, // bounty = 100_000 per run
+        &5,       // max 5 runs
+        &200_000, // initial funding covers only 2 runs
+    );
+
+    assert_eq!(f.vault.get_job_escrow(&job_id), 200_000);
+    assert!(f.engine.is_executable(&job_id));
+
+    // Run #1 by Keeper 1 at t = 2000
+    let receipt1 = f.engine.execute_job(&keeper1, &job_id);
+    assert_eq!(receipt1.run_number, 1);
+    assert_eq!(receipt1.keeper_reward, 95_000);
+    assert_eq!(receipt1.protocol_fee, 5_000);
+    assert_eq!(f.registry.get_keeper(&keeper1).total_executions, 1);
+    assert_eq!(f.vault.get_job_escrow(&job_id), 100_000);
+
+    // Advance time to t = 2035: Run #2 by Keeper 2
+    f.env.ledger().with_mut(|li| {
+        li.timestamp = 2_035;
+    });
+    assert!(f.engine.is_executable(&job_id));
+    let receipt2 = f.engine.execute_job(&keeper2, &job_id);
+    assert_eq!(receipt2.run_number, 2);
+    assert_eq!(receipt2.keeper_reward, 95_000);
+    assert_eq!(receipt2.protocol_fee, 5_000);
+    assert_eq!(f.registry.get_keeper(&keeper2).total_executions, 1);
+    assert_eq!(f.vault.get_job_escrow(&job_id), 0);
+
+    // Advance time to t = 2070: Escrow is now exhausted (0 remaining < 100_000 bounty)
+    f.env.ledger().with_mut(|li| {
+        li.timestamp = 2_070;
+    });
+    assert!(!f.engine.is_executable(&job_id));
+    let exhausted_err = f.engine.try_execute_job(&keeper1, &job_id);
+    assert!(exhausted_err.is_err());
+
+    // Owner tops up job escrow in vault by 200_000 (covers 2 more runs)
+    f.vault.top_up_job(&owner, &job_id, &200_000);
+    assert_eq!(f.vault.get_job_escrow(&job_id), 200_000);
+    assert!(f.engine.is_executable(&job_id));
+
+    // Run #3 by Keeper 1 at t = 2070
+    let receipt3 = f.engine.execute_job(&keeper1, &job_id);
+    assert_eq!(receipt3.run_number, 3);
+    assert_eq!(f.registry.get_keeper(&keeper1).total_executions, 2);
+
+    // Keeper 2 requests unbonding, placing them in Unbonding state
+    f.registry.request_unbond(&keeper2);
+    assert!(!f.registry.is_active_keeper(&keeper2));
+
+    // Advance time to t = 2105: Keeper 2 cannot execute while unbonding
+    f.env.ledger().with_mut(|li| {
+        li.timestamp = 2_105;
+    });
+    let unbonding_err = f.engine.try_execute_job(&keeper2, &job_id);
+    assert!(unbonding_err.is_err());
+
+    // Keeper 1 executes Run #4
+    let receipt4 = f.engine.execute_job(&keeper1, &job_id);
+    assert_eq!(receipt4.run_number, 4);
+    assert_eq!(f.registry.get_keeper(&keeper1).total_executions, 3);
+
+    // Cancel job and refund remaining 0 escrow
+    let refund = f.engine.cancel_job(&owner, &job_id);
+    assert_eq!(refund, 0);
     assert_eq!(f.engine.get_job(&job_id).status, JobStatus::Cancelled);
 }
