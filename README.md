@@ -6,7 +6,6 @@
 
 [![CI](https://github.com/takt-protocol/takt-contract/actions/workflows/ci.yml/badge.svg)](https://github.com/takt-protocol/takt-contract/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Soroban SDK](https://img.shields.io/badge/Soroban%20SDK-22.0.0-purple.svg)](https://crates.io/crates/soroban-sdk)
 
 Decentralized task scheduling and bounty-incentivized keeper execution primitive on Stellar Soroban.
 
