@@ -15,11 +15,11 @@ Decentralized task scheduling and bounty-incentivized keeper execution primitive
 
 Soroban smart contracts cannot self-execute on a scheduled basis, nor can they react autonomously to time without external invocation. Additionally, idle state data in Soroban risks being archived if storage time-to-live (TTL) thresholds lapse.
 
-**Takt Protocol** provides on-chain infrastructure for trust-minimized, automated contract execution on Stellar:
-- **Decentralized Task Scheduling:** Register repetitive or one-off tasks with custom intervals and execution constraints.
-- **Dynamic Cross-Contract Invocations:** Invocations pass arbitrary contract targets, function symbols, and argument vectors safely via `env.invoke_contract`.
-- **SEP-41 Escrow & Bounty Settlement:** Users fund per-job escrows in any SEP-41 token, rewarding decentralized keepers while deducting a protocol fee into the treasury.
-- **Keeper Economic Security:** Keepers stake tokens with mandatory unbonding cooldown periods and are subject to admin slashing for malicious behavior.
+**Takt Protocol** provides on-chain infrastructure for automated contract execution on Stellar (admin-governed in alpha):
+- **Task Scheduling (Admin-Governed in Alpha):** Register repetitive or one-off tasks with custom intervals and execution constraints.
+- **Dynamic Cross-Contract Invocations:** Invocations pass arbitrary contract targets, function symbols, and argument vectors via `env.invoke_contract`.
+- **SEP-41 Escrow & Bounty Settlement:** Users fund per-job escrows in any SEP-41 token, rewarding keepers while deducting a protocol fee into the treasury.
+- **Keeper Economic Security (Admin-Governed in Alpha):** Keepers stake tokens with mandatory unbonding cooldown periods and are subject to admin slashing for malicious behavior.
 
 ---
 
@@ -80,7 +80,7 @@ From the maintainer's testnet deployment log, Job #2 is a live example (target k
 - **Audit Status:** Unaudited. Do not deploy with mainnet funds until formal security review is completed.
 - **Trust Assumptions & Roadmap:**
   - `initialize`, `set_engine`, and `slash_keeper` are currently governed by a single configured `admin` address (`GBKGRYZZEELD6POCG5E3MNMA3CT7OKF45CUX3FUDSJH6NJXAMTPXIYRS` on Testnet). Migrating admin controls to a multi-sig / timelock contract is planned on the roadmap.
-  - Target contract execution (`execute_job`) dispatches cross-contract calls (`env.invoke_contract`) without caller reentrancy guards beyond Soroban's native host frame isolation.
+  - Target contract execution (`execute_job`) verifies keeper and interval eligibility, records execution in `keeper-registry`, dispatches the cross-contract call (`env.invoke_contract`), and triggers bounty payout via `bounty-vault`.
 
 ---
 
@@ -168,7 +168,7 @@ Run the automated testnet deployment script to deploy and link all contracts in 
 
 ## Related Repositories
 
-- [`takt-protocol/takt-app`](https://github.com/takt-protocol/takt-app): Web dashboard, TypeScript SDK, event indexer, and autonomous keeper node client for the Takt Protocol.
+- [`takt-protocol/takt-app`](https://github.com/takt-protocol/takt-app): Web dashboard, TypeScript SDK, and autonomous keeper node client for the Takt Protocol (event indexer planned).
 
 ---
 
