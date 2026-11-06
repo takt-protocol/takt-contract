@@ -141,3 +141,32 @@ fn test_record_execution_and_slash_recovery() {
     assert_eq!(new_total, 1_100_000_000);
     assert!(client.is_active_keeper(&keeper));
 }
+
+#[test]
+fn test_get_config_before_and_after_initialize() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(KeeperRegistry, ());
+    let uninit_client = KeeperRegistryClient::new(&env, &contract_id);
+
+    let uninit_res = uninit_client.try_get_config();
+    assert_eq!(uninit_res, Err(Ok(RegistryError::NotInitialized)));
+
+    let admin = Address::generate(&env);
+    let token_addr = Address::generate(&env);
+    let engine = Address::generate(&env);
+
+    uninit_client.initialize(&admin, &token_addr, &1_000_000_000, &86_400);
+
+    let cfg_before_engine = uninit_client.get_config();
+    assert_eq!(cfg_before_engine.admin, admin);
+    assert_eq!(cfg_before_engine.stake_token, token_addr);
+    assert_eq!(cfg_before_engine.min_stake, 1_000_000_000);
+    assert_eq!(cfg_before_engine.unbond_period, 86_400);
+    assert_eq!(cfg_before_engine.job_engine, None);
+
+    uninit_client.set_engine(&engine);
+    let cfg_after_engine = uninit_client.get_config();
+    assert_eq!(cfg_after_engine.job_engine, Some(engine));
+}

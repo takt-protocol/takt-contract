@@ -2,14 +2,35 @@ use soroban_sdk::{Address, Env};
 
 use crate::errors::RegistryError;
 use crate::types::{
-    DataKey, KeeperInfo, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD, PERSISTENT_BUMP_AMOUNT,
-    PERSISTENT_LIFETIME_THRESHOLD,
+    DataKey, KeeperInfo, RegistryConfig, INSTANCE_BUMP_AMOUNT, INSTANCE_LIFETIME_THRESHOLD,
+    PERSISTENT_BUMP_AMOUNT, PERSISTENT_LIFETIME_THRESHOLD,
 };
 
 pub fn extend_instance_ttl(env: &Env) {
     env.storage()
         .instance()
         .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+}
+
+pub fn extend_instance(env: &Env) {
+    extend_instance_ttl(env);
+}
+
+pub fn get_config(env: &Env) -> Result<RegistryConfig, RegistryError> {
+    let admin = get_admin(env)?;
+    let stake_token = get_stake_token(env)?;
+    let min_stake = get_min_stake(env)?;
+    let unbond_period = get_unbond_period(env)?;
+    let job_engine = env.storage().instance().get(&DataKey::JobEngine);
+    extend_instance_ttl(env);
+
+    Ok(RegistryConfig {
+        admin,
+        stake_token,
+        min_stake,
+        unbond_period,
+        job_engine,
+    })
 }
 
 pub fn has_admin(env: &Env) -> bool {

@@ -11,7 +11,7 @@ mod test;
 use soroban_sdk::{contract, contractimpl, token, Address, Env};
 
 use crate::errors::RegistryError;
-use crate::types::{KeeperInfo, KeeperStatus};
+use crate::types::{KeeperInfo, KeeperStatus, RegistryConfig};
 
 #[contract]
 pub struct KeeperRegistry;
@@ -257,5 +257,9 @@ impl KeeperRegistry {
 
     pub fn get_total_keepers(env: Env) -> u32 {
         storage::get_total_keepers(&env)
+    }
+
+    pub fn get_config(env: Env) -> Result<RegistryConfig, RegistryError> {
+        storage::get_config(&env)
     }
 }
