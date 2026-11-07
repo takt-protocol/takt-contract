@@ -194,3 +194,92 @@ fn test_pause_resume_and_cancel_with_escrow_refund() {
     assert_eq!(f.vault.get_user_balance(&owner), 1_000_000);
     assert_eq!(f.engine.get_job(&job_id).status, JobStatus::Cancelled);
 }
+
+#[test]
+fn test_get_jobs_by_owner_pagination_and_isolation() {
+    let f = setup_fixture();
+
+    let owner1 = Address::generate(&f.env);
+    let owner2 = Address::generate(&f.env);
+    let stranger = Address::generate(&f.env);
+
+    f.token_admin_client.mint(&owner1, &10_000_000);
+    f.token_admin_client.mint(&owner2, &10_000_000);
+
+    f.vault.deposit(&owner1, &5_000_000);
+    f.vault.deposit(&owner2, &5_000_000);
+
+    let args: Vec<Val> = vec![&f.env, 1u32.into_val(&f.env)];
+
+    // Create 25 jobs for owner1
+    for _ in 0..25 {
+        f.engine.create_job(
+            &owner1,
+            &f.counter_addr,
+            &Symbol::new(&f.env, "increment"),
+            &args,
+            &10,
+            &100,
+            &1,
+            &100,
+        );
+    }
+
+    // Create 3 jobs for owner2
+    for _ in 0..3 {
+        f.engine.create_job(
+            &owner2,
+            &f.counter_addr,
+            &Symbol::new(&f.env, "increment"),
+            &args,
+            &10,
+            &100,
+            &1,
+            &100,
+        );
+    }
+
+    assert_eq!(f.engine.get_total_jobs(), 28);
+
+    // Test 1: Page 1 with limit = 20 (max capped)
+    let page1 = f.engine.get_jobs_by_owner(&owner1, &0, &20);
+    assert_eq!(page1.len(), 20);
+    assert_eq!(page1.get(0).unwrap().id, 1);
+    assert_eq!(page1.get(19).unwrap().id, 20);
+
+    // Test 2: Limit request > 20 is capped to 20
+    let capped = f.engine.get_jobs_by_owner(&owner1, &0, &50);
+    assert_eq!(capped.len(), 20);
+
+    // Test 3: Partial page: offset = 20, limit = 20 returns remaining 5
+    let page2 = f.engine.get_jobs_by_owner(&owner1, &20, &20);
+    assert_eq!(page2.len(), 5);
+    assert_eq!(page2.get(0).unwrap().id, 21);
+    assert_eq!(page2.get(4).unwrap().id, 25);
+
+    // Test 4: Offset at total jobs (out of bounds) returns 0
+    let empty_offset = f.engine.get_jobs_by_owner(&owner1, &25, &10);
+    assert_eq!(empty_offset.len(), 0);
+
+    // Test 5: Offset far beyond total jobs returns 0
+    let far_offset = f.engine.get_jobs_by_owner(&owner1, &100, &10);
+    assert_eq!(far_offset.len(), 0);
+
+    // Test 6: Limit = 0 returns 0
+    let zero_limit = f.engine.get_jobs_by_owner(&owner1, &0, &0);
+    assert_eq!(zero_limit.len(), 0);
+
+    // Test 7: Multiple distinct owners isolation
+    let owner2_jobs = f.engine.get_jobs_by_owner(&owner2, &0, &10);
+    assert_eq!(owner2_jobs.len(), 3);
+    assert_eq!(owner2_jobs.get(0).unwrap().id, 26);
+    assert_eq!(owner2_jobs.get(1).unwrap().id, 27);
+    assert_eq!(owner2_jobs.get(2).unwrap().id, 28);
+    for i in 0..owner2_jobs.len() {
+        assert_eq!(owner2_jobs.get(i).unwrap().owner, owner2);
+    }
+
+    // Test 8: Stranger address with 0 jobs returns empty
+    let stranger_jobs = f.engine.get_jobs_by_owner(&stranger, &0, &10);
+    assert_eq!(stranger_jobs.len(), 0);
+}
